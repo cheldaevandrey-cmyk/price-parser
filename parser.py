@@ -31,13 +31,20 @@ def fetch_page(query: str, page: int, session: requests.Session) -> list[dict]:
         "spp": "30",
         "page": str(page),
     }
-    try:
-        resp = session.get(BASE_URL, params=params, timeout=10)
-        resp.raise_for_status()
-        return resp.json().get("products") or []
-    except Exception as e:
-        print(f"  ⚠ Ошибка на странице {page}: {e}")
-        return []
+    for attempt in range(1, 4):
+        try:
+            resp = session.get(BASE_URL, params=params, timeout=10)
+            if resp.status_code == 429:
+                wait = attempt * 5
+                print(f"  ⏳ Лимит запросов, жду {wait}с...", end=" ", flush=True)
+                time.sleep(wait)
+                continue
+            resp.raise_for_status()
+            return resp.json().get("products") or []
+        except Exception as e:
+            print(f"  ⚠ Попытка {attempt}/3: {e}")
+            time.sleep(3)
+    return []
 
 
 def parse_product(p: dict) -> dict | None:
